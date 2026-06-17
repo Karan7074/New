@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Admin — Doge store." />
+  <title>Admin — Doge</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐕</text></svg>" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 16px; margin: 18px 0 26px; }
+    .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+    .stat .v { font-size: 1.8rem; font-weight: 800; }
+    .stat .l { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
+    .admin-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 22px; align-items: start; }
+    .prow { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .prow:last-child { border-bottom: none; }
+    .prow .emo { font-size: 1.6rem; width: 38px; text-align: center; }
+    .prow .nm { flex: 1; min-width: 0; }
+    .prow .nm b { display: block; }
+    .prow .nm span { color: var(--muted); font-size: .8rem; }
+    .admin-form .field-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    @media (max-width: 900px) { .admin-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <main class="wrap">
+    <nav class="breadcrumb"><a href="index.html">Home</a> / <span>Admin</span></nav>
+    <div id="admin-root"><div class="empty-state"><span class="emo">🐾</span>Loading…</div></div>
+  </main>
+
+  <div id="app-footer"></div>
+  <script src="app.js"></script>
+  <script>
+    function onDogeReady() {
+      if (!Doge.user || !Doge.user.isAdmin) {
+        document.getElementById('admin-root').innerHTML = `
+          <div class="empty-state">
+            <span class="emo">🔒</span>
+            <p style="font-size:1.1rem;margin-bottom:16px">Admins only. Such restricted.</p>
+            <a href="account.html" class="btn btn-primary">Log in as admin</a>
+            <p class="drawer-note" style="margin-top:14px">Demo: admin@doge.com / doge1234</p>
+          </div>`;
+        return;
+      }
+      renderAdmin();
+    }
+
+    async function renderAdmin() {
+      const root = document.getElementById('admin-root');
+      root.innerHTML = `
+        <h1 style="font-size:1.8rem;margin:16px 0 4px">Admin dashboard ⚙️</h1>
+        <p style="color:var(--muted)">Manage products and review orders.</p>
+        <div class="admin-stats" id="admin-stats"></div>
+        <div class="admin-grid">
+          <div class="panel">
+            <h2 style="margin-bottom:8px">Products</h2>
+            <div id="admin-products"></div>
+          </div>
+          <div>
+            <div class="panel admin-form" style="margin-bottom:22px">
+              <h2 style="margin-bottom:14px" id="form-title">Add product</h2>
+              <form id="product-form">
+                <input type="hidden" id="pf-id" />
+                <div class="field"><label for="pf-name">Name</label><input id="pf-name" required placeholder="Doge Beanie" /></div>
+                <div class="field-row3">
+                  <div class="field"><label for="pf-emoji">Emoji</label><input id="pf-emoji" placeholder="🐾" /></div>
+                  <div class="field"><label for="pf-price">Price</label><input id="pf-price" type="number" step="0.01" min="0" required placeholder="19.99" /></div>
+                  <div class="field"><label for="pf-stock">Stock</label><input id="pf-stock" type="number" min="0" placeholder="20" /></div>
+                </div>
+                <div class="field-row">
+                  <div class="field"><label for="pf-cat">Category</label><input id="pf-cat" placeholder="Apparel" /></div>
+                  <div class="field"><label for="pf-tag">Tag</label><input id="pf-tag" placeholder="new / sale / hot" /></div>
+                </div>
+                <div class="field"><label for="pf-desc">Description</label><input id="pf-desc" placeholder="Such warm. Much cozy." /></div>
+                <p id="pf-error" style="color:var(--danger);font-size:.85rem;margin-bottom:8px"></p>
+                <div style="display:flex;gap:10px">
+                  <button type="submit" class="btn btn-primary btn-block" id="pf-submit">Add product</button>
+                  <button type="button" class="btn btn-ghost" id="pf-reset" hidden>Cancel</button>
+                </div>
+              </form>
+            </div>
+            <div class="panel">
+              <h2 style="margin-bottom:14px">Recent orders</h2>
+              <div id="admin-orders"></div>
+            </div>
+          </div>
+        </div>`;
+
+      document.getElementById('product-form').addEventListener('submit', saveProduct);
+      document.getElementById('pf-reset').addEventListener('click', resetForm);
+      await Promise.all([loadStats(), loadProducts(), loadOrders()]);
+    }
+
+    async function loadStats() {
+      try {
+        const { stats } = await api('GET', '/api/admin/stats');
+        document.getElementById('admin-stats').innerHTML = `
+          <div class="stat"><div class="v">${stats.orders}</div><div class="l">Orders</div></div>
+          <div class="stat"><div class="v">${money(stats.revenue)}</div><div class="l">Revenue</div></div>
+          <div class="stat"><div class="v">${stats.products}</div><div class="l">Products</div></div>
+          <div class="stat"><div class="v">${stats.customers}</div><div class="l">Customers</div></div>`;
+      } catch (e) { /* ignore */ }
+    }
+
+    async function loadProducts() {
+      const { products } = await api('GET', '/api/products');
+      Doge.products = products;
+      document.getElementById('admin-products').innerHTML = products.map((p) => `
+        <div class="prow">
+          <span class="emo">${p.emoji}</span>
+          <div class="nm"><b>${escapeHtml(p.name)}</b><span>${escapeHtml(p.cat)} · ${money(p.price)} · stock ${p.stock}</span></div>
+          <button class="btn btn-ghost btn-sm" data-edit="${p.id}">Edit</button>
+          <button class="link-remove" data-del="${p.id}">Delete</button>
+        </div>`).join('');
+
+      document.querySelectorAll('[data-edit]').forEach((b) => b.onclick = () => editProduct(b.dataset.edit));
+      document.querySelectorAll('[data-del]').forEach((b) => b.onclick = () => deleteProduct(b.dataset.del));
+    }
+
+    async function loadOrders() {
+      const { orders } = await api('GET', '/api/admin/orders');
+      const el = document.getElementById('admin-orders');
+      if (!orders.length) { el.innerHTML = `<p style="color:var(--muted)">No orders yet.</p>`; return; }
+      el.innerHTML = orders.slice(0, 12).map((o) => `
+        <div class="prow">
+          <div class="nm"><b>${o.id}</b><span>${escapeHtml(o.customer.email)} · ${o.items.reduce((a, i) => a + i.qty, 0)} items</span></div>
+          <span style="font-weight:800">${money(o.total)}</span>
+        </div>`).join('');
+    }
+
+    function editProduct(id) {
+      const p = Doge.products.find((x) => x.id === id);
+      if (!p) return;
+      document.getElementById('form-title').textContent = 'Edit: ' + p.name;
+      document.getElementById('pf-id').value = p.id;
+      document.getElementById('pf-name').value = p.name;
+      document.getElementById('pf-emoji').value = p.emoji;
+      document.getElementById('pf-price').value = p.price;
+      document.getElementById('pf-stock').value = p.stock;
+      document.getElementById('pf-cat').value = p.cat;
+      document.getElementById('pf-tag').value = p.tag || '';
+      document.getElementById('pf-desc').value = p.desc || '';
+      document.getElementById('pf-submit').textContent = 'Save changes';
+      document.getElementById('pf-reset').hidden = false;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetForm() {
+      const f = document.getElementById('product-form');
+      f.reset();
+      document.getElementById('pf-id').value = '';
+      document.getElementById('form-title').textContent = 'Add product';
+      document.getElementById('pf-submit').textContent = 'Add product';
+      document.getElementById('pf-reset').hidden = true;
+      document.getElementById('pf-error').textContent = '';
+    }
+
+    async function saveProduct(e) {
+      e.preventDefault();
+      const errEl = document.getElementById('pf-error');
+      errEl.textContent = '';
+      const body = {
+        id: document.getElementById('pf-id').value || undefined,
+        name: document.getElementById('pf-name').value.trim(),
+        emoji: document.getElementById('pf-emoji').value.trim() || '🐾',
+        price: parseFloat(document.getElementById('pf-price').value),
+        stock: document.getElementById('pf-stock').value === '' ? undefined : parseInt(document.getElementById('pf-stock').value, 10),
+        cat: document.getElementById('pf-cat').value.trim() || 'Accessories',
+        tag: document.getElementById('pf-tag').value.trim() || undefined,
+        desc: document.getElementById('pf-desc').value.trim(),
+      };
+      try {
+        await api('POST', '/api/admin/products', body);
+        showToast('Product saved 🎉');
+        resetForm();
+        await Promise.all([loadProducts(), loadStats()]);
+      } catch (err) { errEl.textContent = '⚠️ ' + err.message; }
+    }
+
+    async function deleteProduct(id) {
+      if (!confirm('Delete this product? Such permanent.')) return;
+      try {
+        await api('DELETE', '/api/admin/products/' + id);
+        showToast('Product deleted');
+        await Promise.all([loadProducts(), loadStats()]);
+      } catch (err) { showToast('⚠️ ' + err.message); }
+    }
+  </script>
+</body>
+</html>

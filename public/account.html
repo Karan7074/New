@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Your account — Doge store." />
+  <title>Account — Doge</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐕</text></svg>" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .auth-wrap { max-width: 440px; margin: 30px auto 60px; }
+    .tabs { display: flex; gap: 6px; background: var(--surface-alt); padding: 5px; border-radius: 999px; margin-bottom: 22px; }
+    .tab { flex: 1; border: none; background: none; padding: 10px; border-radius: 999px; font-weight: 700; color: var(--muted); }
+    .tab.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+    .order-card { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 14px; background: var(--surface); }
+    .order-card .head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+    .order-card .id { font-weight: 800; color: var(--brand-dark); }
+    .order-card .items { color: var(--muted); font-size: .88rem; }
+    .pill-status { background: rgba(31,191,143,.16); color: var(--mint); padding: 3px 10px; border-radius: 999px; font-size: .72rem; font-weight: 800; text-transform: capitalize; }
+  </style>
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <main class="wrap">
+    <nav class="breadcrumb"><a href="index.html">Home</a> / <span>Account</span></nav>
+    <div id="account-root"><div class="empty-state"><span class="emo">🐾</span>Loading…</div></div>
+  </main>
+
+  <div id="app-footer"></div>
+  <script src="app.js"></script>
+  <script>
+    function onDogeReady() { Doge.user ? renderProfile() : renderAuthForms('login'); }
+
+    /* ---- logged-out: login / register ---- */
+    function renderAuthForms(tab) {
+      const root = document.getElementById('account-root');
+      root.innerHTML = `
+        <div class="auth-wrap">
+          <h1 style="text-align:center;font-size:1.8rem;margin-bottom:6px">Welcome to Doge 🐕</h1>
+          <p style="text-align:center;color:var(--muted);margin-bottom:22px">Sign in or create an account to track orders.</p>
+          <div class="panel">
+            <div class="tabs">
+              <button class="tab ${tab === 'login' ? 'active' : ''}" data-tab="login">Log in</button>
+              <button class="tab ${tab === 'register' ? 'active' : ''}" data-tab="register">Register</button>
+            </div>
+            <form id="auth-form">
+              ${tab === 'register' ? `<div class="field"><label for="af-name">Full name</label><input id="af-name" required placeholder="Doge McShibe" /></div>` : ''}
+              <div class="field"><label for="af-email">Email</label><input id="af-email" type="email" required placeholder="wow@doge.com" /></div>
+              <div class="field"><label for="af-pass">Password</label><input id="af-pass" type="password" required placeholder="${tab === 'register' ? 'At least 6 characters' : '••••••••'}" /></div>
+              <p id="auth-error" style="color:var(--danger);font-size:.85rem;margin-bottom:10px"></p>
+              <button type="submit" class="btn btn-primary btn-block">${tab === 'register' ? 'Create account 🎉' : 'Log in →'}</button>
+            </form>
+            ${tab === 'login' ? `<p class="drawer-note" style="text-align:center;margin-top:14px">Try the admin demo: <b>admin@doge.com</b> / <b>doge1234</b></p>` : ''}
+          </div>
+        </div>`;
+
+      root.querySelectorAll('[data-tab]').forEach((b) => b.onclick = () => renderAuthForms(b.dataset.tab));
+      document.getElementById('auth-form').addEventListener('submit', (e) => submitAuth(e, tab));
+    }
+
+    async function submitAuth(e, tab) {
+      e.preventDefault();
+      const errEl = document.getElementById('auth-error');
+      errEl.textContent = '';
+      const body = {
+        email: document.getElementById('af-email').value.trim(),
+        password: document.getElementById('af-pass').value,
+      };
+      if (tab === 'register') body.name = document.getElementById('af-name').value.trim();
+      try {
+        const { user } = await api('POST', tab === 'register' ? '/api/auth/register' : '/api/auth/login', body);
+        Doge.user = user;
+        renderAuthArea();
+        showToast(`Welcome${tab === 'register' ? '' : ' back'}, ${user.name.split(' ')[0]}! 🐕`);
+        renderProfile();
+      } catch (err) {
+        errEl.textContent = '⚠️ ' + err.message;
+      }
+    }
+
+    /* ---- logged-in: profile + orders ---- */
+    async function renderProfile() {
+      const root = document.getElementById('account-root');
+      root.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin:16px 0 24px">
+          <div>
+            <h1 style="font-size:1.8rem">Hi, ${escapeHtml(Doge.user.name)} 👋</h1>
+            <p style="color:var(--muted)">${escapeHtml(Doge.user.email)}${Doge.user.isAdmin ? ' · <b style="color:var(--brand-dark)">Admin</b>' : ''}</p>
+          </div>
+          <div style="display:flex;gap:10px">
+            ${Doge.user.isAdmin ? '<a href="admin.html" class="btn btn-ghost">⚙️ Admin panel</a>' : ''}
+            <button class="btn btn-ghost" data-logout>Log out</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h2 style="margin-bottom:16px">Order history</h2>
+          <div id="orders-list"><div class="empty-state"><span class="emo">🐾</span>Loading orders…</div></div>
+        </div>`;
+
+      try {
+        const { orders } = await api('GET', '/api/orders');
+        const list = document.getElementById('orders-list');
+        if (!orders.length) {
+          list.innerHTML = `<div class="empty-state"><span class="emo">📦</span>No orders yet. <a href="index.html#shop" style="color:var(--brand-dark);font-weight:700">Start shopping →</a></div>`;
+          return;
+        }
+        list.innerHTML = orders.map((o) => `
+          <div class="order-card">
+            <div class="head">
+              <span class="id">${o.id}</span>
+              <span class="pill-status">${o.status}</span>
+            </div>
+            <div class="items">${o.items.map((i) => `${i.emoji} ${escapeHtml(i.name)} × ${i.qty}`).join(' · ')}</div>
+            <div class="head" style="margin-top:10px;margin-bottom:0">
+              <span style="color:var(--muted);font-size:.82rem">${new Date(o.createdAt).toLocaleString()}</span>
+              <span style="font-weight:800">${money(o.total)}</span>
+            </div>
+          </div>`).join('');
+      } catch (err) {
+        document.getElementById('orders-list').innerHTML = `<p style="color:var(--danger)">⚠️ ${err.message}</p>`;
+      }
+    }
+  </script>
+</body>
+</html>

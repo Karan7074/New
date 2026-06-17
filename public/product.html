@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Product details — Doge store." />
+  <title>Product — Doge</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐕</text></svg>" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <main class="wrap">
+    <nav class="breadcrumb" id="breadcrumb">
+      <a href="index.html">Home</a> / <a href="index.html#shop">Shop</a>
+    </nav>
+    <div id="detail-root"><div class="empty-state"><span class="emo">🐾</span>Fetching such product…</div></div>
+
+    <section class="section" style="padding-top:10px">
+      <div class="section-head"><div><h2>You might also wow</h2></div></div>
+      <div class="product-grid" id="product-grid"></div>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+  <script src="app.js"></script>
+  <script>
+    function onDogeReady() {
+      const id = new URLSearchParams(location.search).get('id');
+      const p = byId(id);
+      const root = document.getElementById('detail-root');
+      const related = document.getElementById('product-grid');
+
+      if (!p) {
+        root.innerHTML = `<div class="empty-state"><span class="emo">🐶</span>Product not found. Such missing.<br><a href="index.html" class="btn btn-primary" style="margin-top:14px">Back to shop</a></div>`;
+        related.innerHTML = '';
+        return;
+      }
+
+      document.title = `${p.name} — Doge`;
+      document.getElementById('breadcrumb').insertAdjacentHTML('beforeend', ` / <span>${escapeHtml(p.name)}</span>`);
+
+      const was = p.was ? `<span class="was">${money(p.was)}</span>` : '';
+      const out = p.stock === 0;
+      const lowStock = !out && p.stock <= 10 ? `<span style="color:var(--accent);font-weight:700">Only ${p.stock} left!</span>` : '';
+
+      root.innerHTML = `
+        <div class="detail">
+          <div class="detail-media" aria-hidden="true">${p.emoji}</div>
+          <div>
+            <span class="product-cat">${escapeHtml(p.cat)}</span>
+            <h1>${escapeHtml(p.name)}</h1>
+            <span class="product-rating">${ratingStars(p.rating)} <span class="count">${p.rating} · ${p.reviews} reviews</span></span>
+            <span class="price">${was}${money(p.price)}</span>
+            <p class="detail-desc">${escapeHtml(p.desc)}</p>
+            <p style="margin:-8px 0 8px">${out ? '<span style="color:var(--danger);font-weight:700">Out of stock 😢</span>' : lowStock}</p>
+            <div class="detail-actions">
+              <div class="qty">
+                <button id="d-dec" aria-label="Decrease quantity" ${out ? 'disabled' : ''}>−</button>
+                <input id="d-qty" value="1" inputmode="numeric" aria-label="Quantity" ${out ? 'disabled' : ''} />
+                <button id="d-inc" aria-label="Increase quantity" ${out ? 'disabled' : ''}>+</button>
+              </div>
+              <button class="btn btn-primary" id="d-add" ${out ? 'disabled' : ''}>Add to bag 🛍️</button>
+              <button class="btn btn-ghost" id="d-buy" ${out ? 'disabled' : ''}>Buy now</button>
+            </div>
+            <div class="detail-meta">
+              <span>🚚 Free shipping over $50 · ships in 1–2 business days</span>
+              <span>↩️ 30-day returns · 💛 1-year quality guarantee</span>
+            </div>
+          </div>
+        </div>`;
+
+      if (!out) {
+        const qtyInput = document.getElementById('d-qty');
+        const clampQty = () => {
+          let v = parseInt(qtyInput.value, 10);
+          if (isNaN(v) || v < 1) v = 1;
+          if (v > p.stock) v = p.stock;
+          qtyInput.value = v;
+          return v;
+        };
+        document.getElementById('d-inc').onclick = () => { qtyInput.value = Math.min(p.stock, clampQty() + 1); };
+        document.getElementById('d-dec').onclick = () => { qtyInput.value = Math.max(1, clampQty() - 1); };
+        qtyInput.addEventListener('change', clampQty);
+        document.getElementById('d-add').onclick = () => addToCart(p.id, clampQty());
+        document.getElementById('d-buy').onclick = async () => { await addToCart(p.id, clampQty()); location.href = 'cart.html'; };
+      }
+
+      const rel = Doge.products.filter((x) => x.cat === p.cat && x.id !== p.id).slice(0, 4);
+      const fill = rel.length ? rel : Doge.products.filter((x) => x.id !== p.id).slice(0, 4);
+      related.innerHTML = fill.map(productCardHTML).join('');
+    }
+  </script>
+</body>
+</html>

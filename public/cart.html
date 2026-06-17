@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Your bag & checkout — Doge store." />
+  <title>Your Bag — Doge</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐕</text></svg>" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <main class="wrap">
+    <nav class="breadcrumb"><a href="index.html">Home</a> / <span>Your Bag</span></nav>
+    <h1 style="font-size:1.9rem;letter-spacing:-.5px;margin:14px 0 4px">Your Bag 🛍️</h1>
+    <div id="cart-root"><div class="empty-state"><span class="emo">🐾</span>Loading your bag…</div></div>
+  </main>
+
+  <div id="app-footer"></div>
+  <script src="app.js"></script>
+  <script>
+    let ordered = false;
+
+    function onDogeReady() { renderCartPage(); }
+    // re-render when the cart changes (drawer / qty buttons), unless we've placed an order
+    function onCartChange() { if (!ordered) renderCartPage(); }
+
+    function renderCartPage() {
+      const root = document.getElementById('cart-root');
+      const c = Doge.cart;
+
+      if (!c.items.length) {
+        root.innerHTML = `
+          <div class="empty-state">
+            <span class="emo">🐶</span>
+            <p style="font-size:1.1rem;margin-bottom:18px">Your bag is empty. Such void!</p>
+            <a href="index.html#shop" class="btn btn-primary">Start shopping</a>
+          </div>`;
+        return;
+      }
+
+      const lines = c.items.map((it) => `
+        <div class="cart-line">
+          <a href="product.html?id=${it.id}" class="cart-line-thumb" aria-hidden="true">${it.emoji}</a>
+          <div class="cart-line-info">
+            <div class="cart-line-name"><a href="product.html?id=${it.id}">${escapeHtml(it.name)}</a></div>
+            <div class="cart-line-price">${money(it.price)} each · <b>${money(it.lineTotal)}</b></div>
+            <div class="cart-line-bottom">
+              <div class="qty-mini">
+                <button data-dec="${it.id}" aria-label="Decrease quantity">−</button>
+                <span>${it.qty}</span>
+                <button data-inc="${it.id}" aria-label="Increase quantity">+</button>
+              </div>
+              <button class="link-remove" data-remove="${it.id}">Remove</button>
+            </div>
+          </div>
+        </div>`).join('');
+
+      const freeShipNote = c.shipping > 0
+        ? `<p class="drawer-note">Add ${money(c.freeShippingThreshold - c.subtotal)} more for free shipping! 🚚</p>`
+        : `<p class="drawer-note" style="color:var(--mint)">You unlocked free shipping! 🎉</p>`;
+
+      const prefillName = Doge.user ? escapeHtml(Doge.user.name) : '';
+      const prefillEmail = Doge.user ? escapeHtml(Doge.user.email) : '';
+
+      root.innerHTML = `
+        <div class="cart-layout">
+          <div class="panel">
+            <h2>${c.count} item${c.count > 1 ? 's' : ''}</h2>
+            ${lines}
+          </div>
+          <div class="panel">
+            <h2>Order summary</h2>
+            <div class="summary-row"><span>Subtotal</span><span>${money(c.subtotal)}</span></div>
+            <div class="summary-row"><span>Shipping</span><span>${c.shipping === 0 ? 'Free' : money(c.shipping)}</span></div>
+            <div class="summary-row"><span>Tax (8%)</span><span>${money(c.tax)}</span></div>
+            <div class="summary-row total"><span>Total</span><span>${money(c.total)}</span></div>
+            ${freeShipNote}
+
+            <form id="checkout-form" style="margin-top:18px" novalidate>
+              <div class="field"><label for="cf-name">Full name</label><input id="cf-name" required value="${prefillName}" placeholder="Doge McShibe" /></div>
+              <div class="field"><label for="cf-email">Email</label><input id="cf-email" type="email" required value="${prefillEmail}" placeholder="wow@doge.com" /></div>
+              <div class="field"><label for="cf-addr">Address</label><input id="cf-addr" required placeholder="123 Bork Street" /></div>
+              <div class="field-row">
+                <div class="field"><label for="cf-city">City</label><input id="cf-city" required placeholder="Wowville" /></div>
+                <div class="field"><label for="cf-zip">ZIP</label><input id="cf-zip" required placeholder="00000" /></div>
+              </div>
+              <div class="field"><label for="cf-card">Card number</label><input id="cf-card" required inputmode="numeric" placeholder="4242 4242 4242 4242" /></div>
+              <div class="field-row">
+                <div class="field"><label for="cf-exp">Expiry</label><input id="cf-exp" required placeholder="MM/YY" /></div>
+                <div class="field"><label for="cf-cvc">CVC</label><input id="cf-cvc" required inputmode="numeric" placeholder="123" /></div>
+              </div>
+              <p id="checkout-error" style="color:var(--danger);font-size:.85rem;margin-bottom:10px"></p>
+              <button type="submit" id="pay-btn" class="btn btn-primary btn-block">Pay ${money(c.total)} · Place order</button>
+              <p class="drawer-note" style="text-align:center;margin-top:10px">🔒 Demo checkout — no real payment is processed.</p>
+            </form>
+          </div>
+        </div>`;
+
+      document.getElementById('checkout-form').addEventListener('submit', placeOrder);
+    }
+
+    async function placeOrder(e) {
+      e.preventDefault();
+      const btn = document.getElementById('pay-btn');
+      const errEl = document.getElementById('checkout-error');
+      errEl.textContent = '';
+      const payload = {
+        customer: {
+          name: document.getElementById('cf-name').value.trim(),
+          email: document.getElementById('cf-email').value.trim(),
+          address: document.getElementById('cf-addr').value.trim(),
+          city: document.getElementById('cf-city').value.trim(),
+          zip: document.getElementById('cf-zip').value.trim(),
+        },
+        payment: { card: document.getElementById('cf-card').value.trim() },
+      };
+      btn.disabled = true;
+      btn.textContent = 'Processing… 🐾';
+      try {
+        const { order } = await api('POST', '/api/orders', payload);
+        ordered = true;
+        applyCart(await api('GET', '/api/cart')); // refresh (now empty) badge + drawer
+        showConfirmation(order);
+      } catch (err) {
+        errEl.textContent = '⚠️ ' + err.message;
+        btn.disabled = false;
+        btn.textContent = `Pay ${money(Doge.cart.total)} · Place order`;
+      }
+    }
+
+    function showConfirmation(order) {
+      const itemsList = order.items.map((i) => `${i.emoji} ${escapeHtml(i.name)} × ${i.qty}`).join(' · ');
+      document.getElementById('cart-root').innerHTML = `
+        <div class="confirm">
+          <span class="emo">🎉🐕</span>
+          <h1>Order placed — much wow!</h1>
+          <p>Thanks, ${escapeHtml(order.customer.name.split(' ')[0])}! A confirmation was sent to ${escapeHtml(order.customer.email)}.</p>
+          <div class="order-id">Order ${order.id} · ${money(order.total)}</div>
+          <p style="max-width:520px;margin:0 auto 22px">${itemsList}</p>
+          <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+            <a href="index.html#shop" class="btn btn-primary">Continue shopping</a>
+            ${Doge.user ? '<a href="account.html" class="btn btn-ghost">View my orders</a>'
+                        : '<a href="account.html" class="btn btn-ghost">Create an account to track orders</a>'}
+          </div>
+        </div>`;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  </script>
+</body>
+</html>

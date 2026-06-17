@@ -1,0 +1,14 @@
+{
+  "name": "doge-store",
+  "version": "1.0.0",
+  "description": "Doge — a full-stack, zero-dependency e-commerce store (such shop, much wow).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
