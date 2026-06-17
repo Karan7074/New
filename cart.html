@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Your bag & checkout — Doge store." />
+  <title>Your Bag — Doge</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐕</text></svg>" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark" aria-hidden="true">🐕</span> Do<b>ge</b>
+      </a>
+      <nav class="main-nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="index.html#shop">Shop</a>
+        <a href="index.html#perks">Why Doge</a>
+        <a href="cart.html" class="active">Cart</a>
+      </nav>
+      <div class="header-actions">
+        <button class="cart-btn" data-open-cart aria-label="Open cart">
+          🛍️<span class="cart-count" hidden>0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="breadcrumb"><a href="index.html">Home</a> / <span>Your Bag</span></nav>
+    <h1 style="font-size:1.9rem;letter-spacing:-.5px;margin:14px 0 4px">Your Bag 🛍️</h1>
+    <div id="cart-root"></div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-bottom" style="border:none;justify-content:center">
+        <span>© 2026 Doge Store. All wows reserved. 💛</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+  <script>
+    const SHIPPING_THRESHOLD = 50;
+    const SHIPPING_FEE = 5.99;
+    const TAX_RATE = 0.08;
+
+    function onDogeReady() { renderCartPage(); }
+
+    function renderCartPage() {
+      const root = document.getElementById('cart-root');
+      const cart = getCart();
+      const ids = Object.keys(cart);
+
+      if (!ids.length) {
+        root.innerHTML = `
+          <div class="empty-state">
+            <span class="emo">🐶</span>
+            <p style="font-size:1.1rem;margin-bottom:18px">Your bag is empty. Such void!</p>
+            <a href="index.html#shop" class="btn btn-primary">Start shopping</a>
+          </div>`;
+        return;
+      }
+
+      const subtotal = cartSubtotal();
+      const shipping = subtotal >= SHIPPING_THRESHOLD || subtotal === 0 ? 0 : SHIPPING_FEE;
+      const tax = subtotal * TAX_RATE;
+      const total = subtotal + shipping + tax;
+
+      const lines = ids.map((id) => {
+        const p = byId(id); const q = cart[id];
+        return `
+          <div class="cart-line">
+            <a href="product.html?id=${p.id}" class="cart-line-thumb" aria-hidden="true">${p.emoji}</a>
+            <div class="cart-line-info">
+              <div class="cart-line-name"><a href="product.html?id=${p.id}">${p.name}</a></div>
+              <div class="cart-line-price">${money(p.price)} each · <b>${money(p.price * q)}</b></div>
+              <div class="cart-line-bottom">
+                <div class="qty-mini">
+                  <button data-dec="${id}" aria-label="Decrease quantity">−</button>
+                  <span>${q}</span>
+                  <button data-inc="${id}" aria-label="Increase quantity">+</button>
+                </div>
+                <button class="link-remove" data-remove="${id}">Remove</button>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+      const freeShipNote = shipping > 0
+        ? `<p class="drawer-note">Add ${money(SHIPPING_THRESHOLD - subtotal)} more for free shipping! 🚚</p>`
+        : `<p class="drawer-note" style="color:var(--mint)">You unlocked free shipping! 🎉</p>`;
+
+      root.innerHTML = `
+        <div class="cart-layout">
+          <div class="panel">
+            <h2>${ids.length} item${ids.length > 1 ? 's' : ''}</h2>
+            ${lines}
+          </div>
+          <div class="panel">
+            <h2>Order summary</h2>
+            <div class="summary-row"><span>Subtotal</span><span>${money(subtotal)}</span></div>
+            <div class="summary-row"><span>Shipping</span><span>${shipping === 0 ? 'Free' : money(shipping)}</span></div>
+            <div class="summary-row"><span>Tax (8%)</span><span>${money(tax)}</span></div>
+            <div class="summary-row total"><span>Total</span><span>${money(total)}</span></div>
+            ${freeShipNote}
+
+            <form id="checkout-form" style="margin-top:18px">
+              <div class="field"><label for="cf-name">Full name</label><input id="cf-name" required placeholder="Doge McShibe" /></div>
+              <div class="field"><label for="cf-email">Email</label><input id="cf-email" type="email" required placeholder="wow@doge.com" /></div>
+              <div class="field"><label for="cf-addr">Address</label><input id="cf-addr" required placeholder="123 Bork Street" /></div>
+              <div class="field-row">
+                <div class="field"><label for="cf-city">City</label><input id="cf-city" required placeholder="Wowville" /></div>
+                <div class="field"><label for="cf-zip">ZIP</label><input id="cf-zip" required placeholder="00000" /></div>
+              </div>
+              <div class="field"><label for="cf-card">Card number</label><input id="cf-card" required inputmode="numeric" placeholder="4242 4242 4242 4242" /></div>
+              <div class="field-row">
+                <div class="field"><label for="cf-exp">Expiry</label><input id="cf-exp" required placeholder="MM/YY" /></div>
+                <div class="field"><label for="cf-cvc">CVC</label><input id="cf-cvc" required inputmode="numeric" placeholder="123" /></div>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block">Pay ${money(total)} · Place order</button>
+              <p class="drawer-note" style="text-align:center;margin-top:10px">🔒 Demo checkout — no real payment is processed.</p>
+            </form>
+          </div>
+        </div>`;
+
+      document.getElementById('checkout-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        placeOrder(total);
+      });
+    }
+
+    function placeOrder(total) {
+      const orderId = 'DOGE-' + Math.random().toString(36).slice(2, 7).toUpperCase();
+      localStorage.removeItem('doge_cart_v1');
+      updateCartBadge();
+      renderDrawer();
+      document.getElementById('cart-root').innerHTML = `
+        <div class="confirm">
+          <span class="emo">🎉🐕</span>
+          <h1>Order placed — much wow!</h1>
+          <p>Thank you for shopping with Doge. A confirmation has been sent to your email.</p>
+          <div class="order-id">Order ${orderId} · ${money(total)}</div>
+          <div><a href="index.html#shop" class="btn btn-primary">Continue shopping</a></div>
+        </div>`;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // re-render the cart page whenever the cart changes via drawer/qty controls
+    const _saveCart = saveCart;
+    window.saveCart = function (c) { _saveCart(c); if (document.getElementById('checkout-form') || document.querySelector('.cart-layout')) renderCartPage(); };
+  </script>
+</body>
+</html>
