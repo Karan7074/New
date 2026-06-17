@@ -314,7 +314,9 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
+// '0.0.0.0' so the app is reachable on hosted platforms (Railway, etc.),
+// not just the loopback interface.
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🐕  Doge store running → http://localhost:${PORT}`);
   console.log(`    Admin login: admin@doge.com / doge1234\n`);
 });
